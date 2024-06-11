@@ -1245,7 +1245,7 @@ class TextClip(ImageClip):
                 "-background",
                 "black",
                 "-shadow",
-                "75x3+0+0",
+                "75x8+0+0",
                 ")",
                 "+swap",
                 "-background",
