@@ -13,6 +13,7 @@ import warnings
 import numpy as np
 import proglog
 from imageio import imread, imsave
+from PIL import Image, ImageDraw
 
 from ..Clip import Clip
 from ..compat import DEVNULL, string_types
@@ -658,7 +659,9 @@ class VideoClip(Clip):
             mask = VideoClip(ismask=True, make_frame=make_frame)
             return self.set_mask(mask.set_duration(self.duration))
 
-    def on_color(self, size=None, color=(0, 0, 0), pos=None, col_opacity=None):
+    def on_color(
+        self, size=None, radius=None, color=(0, 0, 0), pos=None, col_opacity=None
+    ):
         """Place the clip on a colored background.
 
         Returns a clip made of the current clip overlaid on a color
@@ -689,12 +692,41 @@ class VideoClip(Clip):
             size = self.size
         if pos is None:
             pos = "center"
-        colorclip = ColorClip(size, color=color)
+        if radius is None:
+            colorclip = ColorClip(size, color=color)
+        else:
+
+            def rounded_corner(size, radius, color):
+                image = Image.new("RGBA", size, (0, 0, 0, 0))
+                draw = ImageDraw.Draw(image)
+
+                # Draw four rounded corners
+                draw.pieslice([0, 0, 2 * radius, 2 * radius], 180, 270, fill=color)
+                draw.pieslice(
+                    [size[0] - 2 * radius, 0, size[0], 2 * radius], 270, 360, fill=color
+                )
+                draw.pieslice(
+                    [0, size[1] - 2 * radius, 2 * radius, size[1]], 90, 180, fill=color
+                )
+                draw.pieslice(
+                    [size[0] - 2 * radius, size[1] - 2 * radius, size[0], size[1]],
+                    0,
+                    90,
+                    fill=color,
+                )
+
+                # Draw rectangles to connect the rounded corners
+                draw.rectangle([radius, 0, size[0] - radius, size[1]], fill=color)
+                draw.rectangle([0, radius, size[0], size[1] - radius], fill=color)
+
+                return ImageClip(np.array(image))
+
+            colorclip = rounded_corner(size=size, radius=radius, color=color)
+
+        colorclip = colorclip.set_duration(self.duration)
 
         if col_opacity is not None:
-            colorclip = ColorClip(
-                size, color=color, duration=self.duration
-            ).set_opacity(col_opacity)
+            colorclip = colorclip.set_opacity(col_opacity)
             result = CompositeVideoClip([colorclip, self.set_position(pos)])
         else:
             result = CompositeVideoClip(
